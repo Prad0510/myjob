@@ -23,10 +23,26 @@ def load_candidate_skills():
 
     return candidate["skills"]
 
+def load_target_roles():
+    with open(
+        "data/processed/candidate_profile.json",
+        "r",
+        encoding="utf-8"
+    ) as file:
+
+        candidate_data = json.load(file)
+
+    return candidate_data.get(
+        "target_roles",
+        []
+    )
 
 def evaluate_jobs():
 
     candidate_skills = load_candidate_skills()
+    target_roles = load_target_roles()
+
+    
 
     connection = get_connection()
     cursor = connection.cursor()
@@ -38,7 +54,8 @@ def evaluate_jobs():
             company,
             location,
             skills,
-            experience_required
+            experience_required,
+            description
         FROM jobs
         ORDER BY id;
     """)
@@ -56,14 +73,16 @@ def evaluate_jobs():
         company,
         location,
         job_skills,
-        experience_required
+        experience_required,
+        description
     ) in jobs:
 
         job_skills = job_skills or []
         
         eligibility = classify_eligibility(
         title,
-        experience_required or ""
+        experience_required or "",
+        description or ""
     )
 
         if eligibility == "not_eligible":
@@ -73,7 +92,9 @@ def evaluate_jobs():
             candidate_skills,
             title,
             job_skills,
-            experience_required or ""
+            experience_required or "",
+            target_roles,
+            description or ""
         )
 
         results.append({
@@ -113,6 +134,16 @@ def evaluate_jobs():
     for job in results
     if job["final_score"] >= MATCH_THRESHOLD
 ]
+    print("\n===== ALL ELIGIBLE/UNCERTAIN JOBS =====")
+
+    for job in results:
+        print(
+        job["title"],
+        "|",
+        job["eligibility"],
+        "|",
+        job["final_score"]
+    )
     print("\n===== JOBS ABOVE THRESHOLD =====")
 
     print(

@@ -317,6 +317,12 @@ def build_candidate_profile(text: str) -> CandidateProfile:
         education=extract_education(sections),
         experience=extract_experience(sections),
         projects=extract_projects(sections),
-        target_roles=[],
+        target_roles=[
+            "Python Developer",
+            "Backend Developer",
+            "Software Engineer",
+            "Data Engineer",
+            "Java Developer",
+        ],
     )
 

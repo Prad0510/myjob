@@ -16,16 +16,16 @@ def main():
 
     job_skills = [
         "Python",
-        "FastAPI",
-        "PostgreSQL",
-        "AWS",
-        "Git",
     ]
 
     score = calculate_weighted_skill_score(
         candidate_skills,
         "Python Backend Intern",
-        job_skills
+        job_skills = [
+    "Python",
+    "FastAPI",
+    "PostgreSQL",
+]
     )
 
     print("\n===== WEIGHTED SKILL SCORE =====")

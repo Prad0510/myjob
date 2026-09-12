@@ -5,18 +5,15 @@ def main():
 
     candidate_skills = [
         "Python",
-        "Java",
-        "React",
-        "Flask",
-        "MySQL",
         "Git",
+        "MySQL",
     ]
 
     job_skills = [
         "Python",
-        "FastAPI",
         "PostgreSQL",
         "Docker",
+        "FastAPI",
         "Git",
     ]
 
@@ -25,14 +22,27 @@ def main():
         job_skills
     )
 
-    print("Matched skills:")
-    print(result["matched_skills"])
+    print("\n===== SKILL MATCH TEST =====")
 
-    print("\nMissing skills:")
-    print(result["missing_skills"])
+    print(
+        "Matched skills:",
+        result["matched_skills"]
+    )
 
-    print("\nTotal job skills:")
-    print(result["total_job_skills"])
+    print(
+        "Partial matches:",
+        result["partial_matches"]
+    )
+
+    print(
+        "Missing skills:",
+        result["missing_skills"]
+    )
+
+    print(
+        "Total job skills:",
+        result["total_job_skills"]
+    )
 
 
 if __name__ == "__main__":

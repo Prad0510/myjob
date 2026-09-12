@@ -1,4 +1,5 @@
 from src.matching.job_matcher import match_job
+from src.matching.category_skill_matcher import compare_skills_by_category
 
 
 def main():
@@ -39,6 +40,20 @@ def main():
         "%"
     )
     print("Final score:", result["final_score"], "%")
+    
+    category_results = compare_skills_by_category(
+    candidate_skills,
+    job_skills
+)
+
+    print("\n===== CATEGORY RESULTS =====")
+
+    for category, result in category_results.items():
+        print(f"\n{category}:")
+        print("Matched:", result["matched"])
+        print("Partial:", result["partial_matches"])
+        print("Missing:", result["missing"])
+
 
 
 if __name__ == "__main__":

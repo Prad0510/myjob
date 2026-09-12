@@ -16,6 +16,12 @@ def calculate_weighted_skill_score(
 ) -> float:
     """
     Calculate a role-dependent weighted skill score.
+
+    Exact matches receive full credit.
+    Related skills receive 50% credit.
+
+    Only categories that contain job-required skills
+    contribute to the final skill score.
     """
 
     role = classify_role(job_title)
@@ -30,7 +36,8 @@ def calculate_weighted_skill_score(
         job_skills
     )
 
-    total_score = 0.0
+    weighted_score = 0.0
+    active_weight = 0.0
 
     for category, weight in weights.items():
 
@@ -38,6 +45,7 @@ def calculate_weighted_skill_score(
             category,
             {
                 "matched": [],
+                "partial_matches": [],
                 "missing": [],
                 "total_required": 0
             }
@@ -45,17 +53,46 @@ def calculate_weighted_skill_score(
 
         total_required = result["total_required"]
 
+        # Ignore categories that are not required by this job
         if total_required == 0:
             continue
 
-        matched = len(result["matched"])
-
-        category_score = (
-            matched / total_required
-        ) * 100
-
-        total_score += (
-            category_score * weight / 100
+        exact_matches = len(
+            result["matched"]
         )
 
-    return round(total_score, 2)
+        partial_matches = len(
+            result["partial_matches"]
+        )
+
+        # Exact = 100% credit
+        # Partial = 50% credit
+        effective_matches = (
+            exact_matches
+            + (partial_matches * 0.5)
+        )
+
+        category_score = (
+            effective_matches / total_required
+        ) * 100
+
+        # Never allow more than 100%
+        category_score = min(
+            category_score,
+            100
+        )
+
+        weighted_score += (
+            category_score * weight
+        )
+
+        active_weight += weight
+
+    if active_weight == 0:
+        return 0.0
+
+    final_score = (
+        weighted_score / active_weight
+    )
+
+    return round(final_score, 2)

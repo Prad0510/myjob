@@ -19,8 +19,13 @@ def match_job(
     candidate_skills: list[str],
     job_title: str,
     job_skills: list[str],
-    experience_required: str = ""
+    experience_required: str = "",
+    target_roles: list[str] | None = None,
+    job_description: str = ""
 ) -> dict:
+    
+    if target_roles is None:
+        target_roles = []
 
     skill_score = calculate_weighted_skill_score(
         candidate_skills,
@@ -29,7 +34,8 @@ def match_job(
     )
 
     role_score = calculate_role_score(
-        job_title
+        job_title,
+        target_roles
     )
 
     experience_score = calculate_experience_score(
