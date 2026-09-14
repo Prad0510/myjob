@@ -1,7 +1,7 @@
 import json
 
 from src.database.connection import get_connection
-from src.matching.semantic_matcher import calculate_semantic_score
+from src.matching.semantic_matcher import calculate_semantic_components
 
 
 def load_candidate_profile():
@@ -13,61 +13,80 @@ def load_candidate_profile():
         return json.load(file)
 
 
-def build_candidate_text(profile):
-    skills = ", ".join(profile.get("skills", []))
-    target_roles = ", ".join(profile.get("target_roles", []))
-
-    return f"""
-    Candidate skills: {skills}
-
-    Target roles: {target_roles}
-    """
+def build_candidate_experience(profile):
+    return " ".join(
+        f"{item.get('role', '')} at {item.get('organization', '')}. "
+        f"{item.get('description', '')}"
+        for item in profile.get("experience", [])
+    )
 
 
-def get_one_job():
+def build_candidate_projects(profile):
+    return " ".join(
+        f"{item.get('name', '')}. "
+        f"Technologies: {', '.join(item.get('technologies', []))}. "
+        f"{item.get('description', '')}"
+        for item in profile.get("projects", [])
+    )
+
+
+def get_test_jobs():
     connection = get_connection()
     cursor = connection.cursor()
 
     cursor.execute("""
-        SELECT title, company, description
+        SELECT title, company, description, skills
         FROM jobs
-        WHERE title = 'Software Engineer, Backend'
-        LIMIT 1;
+        WHERE title IN (
+            'Software Engineer, Backend',
+            'Visual Designer, Web'
+        )
+        ORDER BY title;
     """)
 
-    job = cursor.fetchone()
+    jobs = cursor.fetchall()
 
     cursor.close()
     connection.close()
 
-    return job
+    return jobs
 
 
 profile = load_candidate_profile()
 
-candidate_text = build_candidate_text(profile)
+candidate_skills = profile.get("skills", [])
+candidate_experience = build_candidate_experience(profile)
+candidate_projects = build_candidate_projects(profile)
 
-job = get_one_job()
+jobs = get_test_jobs()
 
-if job is None:
-    print("Job not found.")
+if not jobs:
+    print("Test jobs not found.")
 else:
-    title, company, description = job
+    print("\n===== SEMANTIC COMPARISON TEST =====")
 
-    job_text = f"""
-    Job title: {title}
-    Company: {company}
+    for title, company, description, job_skills in jobs:
 
-    Job description:
-    {description}
-    """
+        result = calculate_semantic_components(
+            candidate_skills=candidate_skills,
+            candidate_experience=candidate_experience,
+            candidate_projects=candidate_projects,
+            job_skills=job_skills or [],
+            job_description=description or ""
+        )
 
-    score = calculate_semantic_score(
-        candidate_text,
-        job_text
-    )
+        print("\n" + "=" * 55)
+        print("Job:", title)
+        print("Company:", company)
 
-    print("\n===== SEMANTIC MATCH TEST =====")
-    print("Job:", title)
-    print("Company:", company)
-    print("Semantic score:", score)
+        print("\nSkill similarity:",
+              result["skill_similarity"])
+
+        print("Experience similarity:",
+              result["experience_similarity"])
+
+        print("Project similarity:",
+              result["project_similarity"])
+
+        print("Semantic score:",
+              result["semantic_score"])

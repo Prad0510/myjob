@@ -56,11 +56,10 @@ def classify_eligibility(
     ]
 
     experience_patterns = [
-        r"(\d+)\+?\s*(?:years?|yrs?)\s*(?:of\s+)?experience",
-        r"(\d+)\+?\s*(?:years?|yrs?)\s*(?:of\s+)?relevant\s+experience",
-        r"(?:minimum|at least)\s+(\d+)\s*(?:years?|yrs?)",
-        r"(\d+)\s*-\s*(\d+)\s*(?:years?|yrs?)\s*(?:of\s+)?experience",
-    ]
+    r"(\d+)\+?\s*(?:years?|yrs?)(?:\s+of)?\s+(?:[\w-]+\s+){0,10}experience",
+    r"(?:minimum|at least)\s+(\d+)\s*(?:years?|yrs?)",
+    r"(\d+)\s*-\s*(\d+)\s*(?:years?|yrs?)\s+(?:[\w-]+\s+){0,10}experience",
+]
 
     for text in experience_sources:
 

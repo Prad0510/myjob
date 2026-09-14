@@ -83,11 +83,10 @@ def classify_job_experience(
     # --------------------------------------------------
 
     experience_patterns = [
-        r"(\d+)\+?\s*(?:years?|yrs?)\s*(?:of\s+)?experience",
-        r"(\d+)\+?\s*(?:years?|yrs?)\s*(?:of\s+)?relevant\s+experience",
-        r"(?:minimum|at least)\s+(\d+)\s*(?:years?|yrs?)",
-    ]
-
+    r"(\d+)\+?\s*(?:years?|yrs?)(?:\s+of)?\s+(?:[\w-]+\s+){0,8}experience",
+    r"(?:minimum|at least)\s+(\d+)\s*(?:years?|yrs?)",
+    r"(\d+)\s*-\s*(\d+)\s*(?:years?|yrs?)\s+(?:[\w-]+\s+){0,8}experience",
+]
     for pattern in experience_patterns:
 
         match = re.search(

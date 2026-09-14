@@ -36,11 +36,47 @@ def load_target_roles():
         "target_roles",
         []
     )
+    
+def load_candidate_experience():
+    with open(
+        "data/processed/candidate_profile.json",
+        "r",
+        encoding="utf-8"
+    ) as file:
+        candidate_data = json.load(file)
+
+    experience = candidate_data.get("experience", [])
+
+    return " ".join(
+        f"{item.get('role', '')} at {item.get('organization', '')}. "
+        f"{item.get('description', '')}"
+        for item in experience
+    )
+
+
+def load_candidate_projects():
+    with open(
+        "data/processed/candidate_profile.json",
+        "r",
+        encoding="utf-8"
+    ) as file:
+        candidate_data = json.load(file)
+
+    projects = candidate_data.get("projects", [])
+
+    return " ".join(
+        f"{item.get('name', '')}. "
+        f"Technologies: {', '.join(item.get('technologies', []))}. "
+        f"{item.get('description', '')}"
+        for item in projects
+    )
 
 def evaluate_jobs():
 
     candidate_skills = load_candidate_skills()
     target_roles = load_target_roles()
+    candidate_experience = load_candidate_experience()
+    candidate_projects = load_candidate_projects()
 
     
 
@@ -79,6 +115,17 @@ def evaluate_jobs():
 
         job_skills = job_skills or []
         
+        if title in ["IT Systems Engineer", "Site Engineer"]:
+            print("\n" + "=" * 80)
+            print(f"DEBUG JOB: {title}")
+            print("=" * 80)
+            print("\nEXTRACTED SKILLS:")
+            print(job_skills)
+            print("\nFULL JOB DESCRIPTION:")
+            print(description)
+            print("=" * 80)
+
+        
         eligibility = classify_eligibility(
         title,
         experience_required or "",
@@ -89,13 +136,15 @@ def evaluate_jobs():
             continue
 
         match_result = match_job(
-            candidate_skills,
-            title,
-            job_skills,
-            experience_required or "",
-            target_roles,
-            description or ""
-        )
+    candidate_skills=candidate_skills,
+    job_title=title,
+    job_skills=job_skills,
+    experience_required=experience_required or "",
+    target_roles=target_roles,
+    job_description=description or "",
+    candidate_experience=candidate_experience,
+    candidate_projects=candidate_projects
+)
 
         results.append({
             "job_id": job_id,
@@ -106,6 +155,10 @@ def evaluate_jobs():
             "skill_score": match_result["skill_score"],
             "role_score": match_result["role_score"],
             "experience_score": match_result["experience_score"],
+            "semantic_score": match_result["semantic_score"],
+            "semantic_skill_similarity": match_result["semantic_skill_similarity"],
+            "semantic_experience_similarity": match_result["semantic_experience_similarity"],
+            "semantic_project_similarity": match_result["semantic_project_similarity"],
             "final_score": match_result["final_score"],
             "matched_skills": match_result.get(
                 "matched_skills", []
@@ -144,6 +197,29 @@ def evaluate_jobs():
         "|",
         job["final_score"]
     )
+        
+    print("\n===== TOP MATCH DETAILS =====")
+
+    top_matches = sorted(
+    results,
+    key=lambda job: job["final_score"],
+    reverse=True
+    )
+    for job in top_matches[:3]:
+        print("\n" + "=" * 60)
+        print(f'{job["title"]} ({job["company"]})')
+        print(f'Final score: {job["final_score"]}%')
+        print(f'Skill score: {job["skill_score"]}%')
+        print(f'Role score: {job["role_score"]}%')
+        print(f'Experience score: {job["experience_score"]}%')
+        print(f'Semantic score: {job["semantic_score"]}%')
+        print(f'Semantic skill similarity: {job["semantic_skill_similarity"]}%')
+        print(f'Semantic experience similarity: {job["semantic_experience_similarity"]}%')
+        print(f'Semantic project similarity: {job["semantic_project_similarity"]}%')
+        print(f'Matched skills: {job["matched_skills"]}')
+        print(f'Missing skills: {job["missing_skills"]}')
+        print(f'Eligibility: {job["eligibility"]}')
+    
     print("\n===== JOBS ABOVE THRESHOLD =====")
 
     print(
