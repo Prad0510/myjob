@@ -39,7 +39,7 @@ def save_match(match: dict) -> bool:
                     semantic_score,
                     application_url
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (job_id) DO NOTHING
                 """,
                 (
@@ -51,6 +51,7 @@ def save_match(match: dict) -> bool:
                     match["skill_score"],
                     match["experience_score"],
                     match["semantic_score"],
+                    match["application_url"]
                 )
             )
 

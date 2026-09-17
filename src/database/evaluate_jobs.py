@@ -204,6 +204,7 @@ def evaluate_jobs():
             "skill_score": job["skill_score"],
             "experience_score": job["experience_score"],
             "semantic_score": job["semantic_score"],
+            "application_url": job["application_url"],
         })
 
         if saved:
