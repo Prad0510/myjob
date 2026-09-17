@@ -5,7 +5,6 @@ from src.matching.weighted_skill_score import (
 from src.matching.category_skill_matcher import (
     compare_skills_by_category
 )
-from src.matching.role_matcher import calculate_role_score
 from src.matching.experience_matcher import (
     calculate_experience_score
 )

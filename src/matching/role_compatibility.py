@@ -102,7 +102,7 @@ def calculate_role_compatibility(
     job_role = classify_job_role(job_title)
 
     if job_role == "unknown":
-        return 30.0
+        return 0.0
 
     target_roles_lower = [
         role.lower().strip()

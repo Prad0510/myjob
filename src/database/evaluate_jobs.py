@@ -3,10 +3,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 import json
-
+from src.database.match_repository import save_match
 from src.database.connection import get_connection
 from src.matching.job_matcher import match_job
 from src.matching.eligibility_filter import classify_eligibility
+from src.notifications.telegram import send_telegram_message
+from src.database.match_repository import save_match
 
 MATCH_THRESHOLD = float(
     os.getenv("MATCH_THRESHOLD", 75)
@@ -91,7 +93,8 @@ def evaluate_jobs():
             location,
             skills,
             experience_required,
-            description
+            description,
+            application_url
         FROM jobs
         ORDER BY id;
     """)
@@ -110,7 +113,8 @@ def evaluate_jobs():
         location,
         job_skills,
         experience_required,
-        description
+        description,
+        application_url
     ) in jobs:
 
         job_skills = job_skills or []
@@ -151,6 +155,7 @@ def evaluate_jobs():
             "title": title,
             "company": company,
             "location": location,
+            "application_url": application_url,
             "eligibility": eligibility,
             "skill_score": match_result["skill_score"],
             "role_score": match_result["role_score"],
@@ -187,6 +192,42 @@ def evaluate_jobs():
     for job in results
     if job["final_score"] >= MATCH_THRESHOLD
 ]
+    # Save and notify new matches above the threshold
+    for job in matching_jobs:
+
+        saved = save_match({
+            "job_id": job["job_id"],
+            "final_score": job["final_score"],
+            "matched_skills": job["matched_skills"],
+            "missing_skills": job["missing_skills"],
+            "role_score": job["role_score"],
+            "skill_score": job["skill_score"],
+            "experience_score": job["experience_score"],
+            "semantic_score": job["semantic_score"],
+        })
+
+        if saved:
+            message = (
+                "🚀 New MyJob Match!\n\n"
+                f"Role: {job['title']}\n"
+                f"Company: {job['company']}\n"
+                f"Location: {job['location']}\n\n"
+                f"Apply: {job['application_url']}\n\n"
+                f"Match Score: {job['final_score']}%\n"
+                f"Skill Score: {job['skill_score']}%\n"
+                f"Role Score: {job['role_score']}%\n"
+                f"Experience Score: {job['experience_score']}%\n"
+                f"Semantic Score: {job['semantic_score']}%\n\n"
+                f"Matched Skills: {', '.join(job['matched_skills']) or 'None'}\n"
+                f"Missing Skills: {', '.join(job['missing_skills']) or 'None'}"
+            )
+
+            send_telegram_message(message)
+
+            print(
+                f"📱 Telegram notification sent: "
+                f"{job['title']} ({job['final_score']}%)"
+            )
     print("\n===== ALL ELIGIBLE/UNCERTAIN JOBS =====")
 
     for job in results:

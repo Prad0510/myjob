@@ -40,6 +40,33 @@ def create_jobs_table():
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     """)
+    
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS job_matches (
+
+        id SERIAL PRIMARY KEY,
+
+        job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+
+        match_score DECIMAL(5,2) NOT NULL,
+
+        matched_skills TEXT[],
+
+        missing_skills TEXT[],
+
+        role_score DECIMAL(5,2),
+
+        skill_score DECIMAL(5,2),
+
+        experience_score DECIMAL(5,2),
+
+        semantic_score DECIMAL(5,2),
+
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+        UNIQUE(job_id)
+    );
+""")
 
     connection.commit()
 
