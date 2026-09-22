@@ -73,7 +73,7 @@ def load_candidate_projects():
         for item in projects
     )
 
-def evaluate_jobs():
+def evaluate_jobs(job_ids):
 
     candidate_skills = load_candidate_skills()
     target_roles = load_target_roles()
@@ -84,8 +84,16 @@ def evaluate_jobs():
 
     connection = get_connection()
     cursor = connection.cursor()
+    
+    if not job_ids:
+        print("No new jobs to evaluate.")
+        return
 
-    cursor.execute("""
+
+    placeholders = ", ".join(["%s"] * len(job_ids))
+
+    cursor.execute(
+        f"""
         SELECT
             id,
             title,
@@ -96,8 +104,11 @@ def evaluate_jobs():
             description,
             application_url
         FROM jobs
+        WHERE id IN ({placeholders})
         ORDER BY id;
-    """)
+        """,
+        job_ids
+    )
 
     jobs = cursor.fetchall()
 
@@ -313,4 +324,4 @@ def evaluate_jobs():
 
 
 if __name__ == "__main__":
-    evaluate_jobs()
+    print("Please provide job IDs when calling evaluate_jobs().")

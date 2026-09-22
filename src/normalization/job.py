@@ -23,3 +23,5 @@ class Job:
     
     source_job_id: str = ""
     fingerprint: str = ""
+
+    source_company: str = ""

@@ -43,4 +43,5 @@ def normalize_job(raw_job: RawJob) -> Job:
             "source_job_id", ""
         ),
         fingerprint=fingerprint,
+        source_company=raw_job.raw_data.get("source_company", ""),
     )
