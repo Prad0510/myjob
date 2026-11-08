@@ -151,12 +151,3 @@ python -m src.jobs.scheduler
 ```
 The bot will listen for resume uploads and automatically push match notifications. The scheduler ensures the job catalogue stays fresh and clustering is refreshed regularly.
 
----
-
-## Contributing
-Contributions are welcome! Please open a pull request with a clear description of the change. Follow the existing code style and run the test suite (`pytest`) before submitting.
-
----
-
-## License
-Distributed under the MIT License. See `LICENSE` for more information.
