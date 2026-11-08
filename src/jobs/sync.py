@@ -11,13 +11,13 @@ from src.database.collection_repository import (
     finish_collection_run,
 )
 from src.database.job_lifecycle import update_job_lifecycle
+from src.utils.logger import get_logger
+
+logger = get_logger("sync")
 
 
 def sync_lever(company_slug: str, company_name: str):
-
-    print(f"\n{'=' * 50}")
-    print(f"Syncing Lever: {company_name}")
-    print(f"{'=' * 50}")
+    logger.info(f"Syncing Lever: {company_name} (slug: {company_slug})")
 
     run_id = start_collection_run(
         source="Lever",
@@ -31,17 +31,14 @@ def sync_lever(company_slug: str, company_name: str):
         )
 
         raw_jobs = collector.fetch_jobs()
-
-        print(f"Found {len(raw_jobs)} jobs")
+        logger.info(f"Lever [{company_name}]: Found {len(raw_jobs)} jobs")
 
         inserted_count = 0
         updated_count = 0
         new_job_ids = []
 
         for raw_job in raw_jobs:
-
             job = normalize_job(raw_job)
-
             job_id, inserted = insert_job(job)
 
             if inserted:
@@ -67,37 +64,31 @@ def sync_lever(company_slug: str, company_name: str):
             jobs_found=len(raw_jobs),
             success=True,
         )
-        
+
         if new_job_ids:
-            print("\nEvaluating new jobs against candidate profile...")
+            logger.info(f"Evaluating {len(new_job_ids)} new jobs against candidate profile...")
             evaluate_jobs(new_job_ids)
 
-        print("\nSync complete")
-        print(f"Inserted: {inserted_count}")
-        print(f"Updated: {updated_count}")
-        print(f"Seen: {lifecycle_result['seen']}")
-        print(f"Missed: {lifecycle_result['missed']}")
-        print(f"Closed: {lifecycle_result['closed']}")
-        print(f"New job IDs: {new_job_ids}")
+        logger.info(
+            f"Lever [{company_name}] sync complete: "
+            f"Inserted={inserted_count}, Updated={updated_count}, "
+            f"Seen={lifecycle_result['seen']}, Missed={lifecycle_result['missed']}, "
+            f"Closed={lifecycle_result['closed']}"
+        )
 
     except Exception as e:
-
         finish_collection_run(
             run_id=run_id,
             jobs_found=0,
             success=False,
             error_message=str(e),
         )
-
-        print(f"Sync failed: {e}")
-
+        logger.error(f"Lever [{company_name}] sync failed: {e}", exc_info=True)
         raise
 
-def sync_greenhouse(board_token: str, company_name: str):
 
-    print(f"\n{'=' * 50}")
-    print(f"Syncing Greenhouse: {company_name}")
-    print(f"{'=' * 50}")
+def sync_greenhouse(board_token: str, company_name: str):
+    logger.info(f"Syncing Greenhouse: {company_name} (token: {board_token})")
 
     run_id = start_collection_run(
         source="Greenhouse",
@@ -110,17 +101,14 @@ def sync_greenhouse(board_token: str, company_name: str):
         )
 
         raw_jobs = collector.fetch_jobs()
-
-        print(f"Found {len(raw_jobs)} jobs")
+        logger.info(f"Greenhouse [{company_name}]: Found {len(raw_jobs)} jobs")
 
         inserted_count = 0
         updated_count = 0
         new_job_ids = []
 
         for raw_job in raw_jobs:
-
             job = normalize_job(raw_job)
-
             job_id, inserted = insert_job(job)
 
             if inserted:
@@ -146,40 +134,34 @@ def sync_greenhouse(board_token: str, company_name: str):
             jobs_found=len(raw_jobs),
             success=True,
         )
-        
+
         if new_job_ids:
-            print("\nEvaluating new jobs against candidate profile...")
+            logger.info(f"Evaluating {len(new_job_ids)} new jobs against candidate profile...")
             evaluate_jobs(new_job_ids)
 
-        print("\nSync complete")
-        print(f"Inserted: {inserted_count}")
-        print(f"Updated: {updated_count}")
-        print(f"Seen: {lifecycle_result['seen']}")
-        print(f"Missed: {lifecycle_result['missed']}")
-        print(f"Closed: {lifecycle_result['closed']}")
-        print(f"New job IDs: {new_job_ids}")
+        logger.info(
+            f"Greenhouse [{company_name}] sync complete: "
+            f"Inserted={inserted_count}, Updated={updated_count}, "
+            f"Seen={lifecycle_result['seen']}, Missed={lifecycle_result['missed']}, "
+            f"Closed={lifecycle_result['closed']}"
+        )
 
     except Exception as e:
-
         finish_collection_run(
             run_id=run_id,
             jobs_found=0,
             success=False,
             error_message=str(e),
         )
-
-        print(f"Sync failed: {e}")
-
+        logger.error(f"Greenhouse [{company_name}] sync failed: {e}", exc_info=True)
         raise
+
 
 def sync_ashby(
     board_name: str,
     company_name: str,
 ):
-
-    print(f"\n{'=' * 50}")
-    print(f"Syncing Ashby: {company_name}")
-    print(f"{'=' * 50}")
+    logger.info(f"Syncing Ashby: {company_name} (board: {board_name})")
 
     run_id = start_collection_run(
         source="Ashby",
@@ -187,51 +169,38 @@ def sync_ashby(
     )
 
     try:
-
         collector = AshbyCollector(
             board_name=board_name,
             company_name=company_name,
         )
 
         raw_jobs = collector.fetch_jobs()
-
-        print(f"Found {len(raw_jobs)} jobs")
+        logger.info(f"Ashby [{company_name}]: Found {len(raw_jobs)} jobs")
 
         inserted_count = 0
         updated_count = 0
         new_job_ids = []
 
         for raw_job in raw_jobs:
-
             job = normalize_job(raw_job)
-
             job_id, inserted = insert_job(job)
 
             if inserted:
-
                 inserted_count += 1
                 new_job_ids.append(job_id)
-
             else:
-
                 updated_count += 1
 
         seen_source_job_ids = {
-            raw_job.raw_data.get(
-                "source_job_id"
-            )
+            raw_job.raw_data.get("source_job_id")
             for raw_job in raw_jobs
-            if raw_job.raw_data.get(
-                "source_job_id"
-            )
+            if raw_job.raw_data.get("source_job_id")
         }
 
         lifecycle_result = update_job_lifecycle(
             source="Ashby",
             source_company=company_name,
-            seen_source_job_ids=(
-                seen_source_job_ids
-            ),
+            seen_source_job_ids=seen_source_job_ids,
         )
 
         finish_collection_run(
@@ -241,54 +210,32 @@ def sync_ashby(
         )
 
         if new_job_ids:
-
-            print(
-                "\nEvaluating new jobs "
-                "against candidate profile..."
-            )
-
+            logger.info(f"Evaluating {len(new_job_ids)} new jobs against candidate profile...")
             evaluate_jobs(new_job_ids)
 
-        print("\nSync complete")
-        print(f"Inserted: {inserted_count}")
-        print(f"Updated: {updated_count}")
-        print(
-            f"Seen: {lifecycle_result['seen']}"
-        )
-        print(
-            f"Missed: {lifecycle_result['missed']}"
-        )
-        print(
-            f"Closed: {lifecycle_result['closed']}"
-        )
-        print(
-            f"New job IDs: {new_job_ids}"
+        logger.info(
+            f"Ashby [{company_name}] sync complete: "
+            f"Inserted={inserted_count}, Updated={updated_count}, "
+            f"Seen={lifecycle_result['seen']}, Missed={lifecycle_result['missed']}, "
+            f"Closed={lifecycle_result['closed']}"
         )
 
     except Exception as e:
-
         finish_collection_run(
             run_id=run_id,
             jobs_found=0,
             success=False,
             error_message=str(e),
         )
-
-        print(f"Sync failed: {e}")
-
+        logger.error(f"Ashby [{company_name}] sync failed: {e}", exc_info=True)
         raise
+
 
 def sync_smartrecruiters(
     company_slug: str,
     company_name: str,
 ):
-
-    print(f"\n{'=' * 50}")
-    print(
-        f"Syncing SmartRecruiters: "
-        f"{company_name}"
-    )
-    print(f"{'=' * 50}")
+    logger.info(f"Syncing SmartRecruiters: {company_name} (slug: {company_slug})")
 
     run_id = start_collection_run(
         source="SmartRecruiters",
@@ -296,51 +243,38 @@ def sync_smartrecruiters(
     )
 
     try:
-
         collector = SmartRecruitersCollector(
             company_slug=company_slug,
             company_name=company_name,
         )
 
         raw_jobs = collector.fetch_jobs()
-
-        print(f"Found {len(raw_jobs)} jobs")
+        logger.info(f"SmartRecruiters [{company_name}]: Found {len(raw_jobs)} jobs")
 
         inserted_count = 0
         updated_count = 0
         new_job_ids = []
 
         for raw_job in raw_jobs:
-
             job = normalize_job(raw_job)
-
             job_id, inserted = insert_job(job)
 
             if inserted:
-
                 inserted_count += 1
                 new_job_ids.append(job_id)
-
             else:
-
                 updated_count += 1
 
         seen_source_job_ids = {
-            raw_job.raw_data.get(
-                "source_job_id"
-            )
+            raw_job.raw_data.get("source_job_id")
             for raw_job in raw_jobs
-            if raw_job.raw_data.get(
-                "source_job_id"
-            )
+            if raw_job.raw_data.get("source_job_id")
         }
 
         lifecycle_result = update_job_lifecycle(
             source="SmartRecruiters",
             source_company=company_name,
-            seen_source_job_ids=(
-                seen_source_job_ids
-            ),
+            seen_source_job_ids=seen_source_job_ids,
         )
 
         finish_collection_run(
@@ -350,76 +284,58 @@ def sync_smartrecruiters(
         )
 
         if new_job_ids:
-
-            print(
-                "\nEvaluating new jobs "
-                "against candidate profile..."
-            )
-
+            logger.info(f"Evaluating {len(new_job_ids)} new jobs against candidate profile...")
             evaluate_jobs(new_job_ids)
 
-        print("\nSync complete")
-        print(f"Inserted: {inserted_count}")
-        print(f"Updated: {updated_count}")
-        print(
-            f"Seen: {lifecycle_result['seen']}"
-        )
-        print(
-            f"Missed: {lifecycle_result['missed']}"
-        )
-        print(
-            f"Closed: {lifecycle_result['closed']}"
-        )
-        print(
-            f"New job IDs: {new_job_ids}"
+        logger.info(
+            f"SmartRecruiters [{company_name}] sync complete: "
+            f"Inserted={inserted_count}, Updated={updated_count}, "
+            f"Seen={lifecycle_result['seen']}, Missed={lifecycle_result['missed']}, "
+            f"Closed={lifecycle_result['closed']}"
         )
 
     except Exception as e:
-
         finish_collection_run(
             run_id=run_id,
             jobs_found=0,
             success=False,
             error_message=str(e),
         )
-
-        print(f"Sync failed: {e}")
-
+        logger.error(f"SmartRecruiters [{company_name}] sync failed: {e}", exc_info=True)
         raise
-    
+
+
 def main():
-
+    logger.info("Starting collection runs across all registered sources...")
     for source in SOURCES:
+        try:
+            if source["source"] == "Lever":
+                sync_lever(
+                    company_slug=source["slug"],
+                    company_name=source["company"],
+                )
+            elif source["source"] == "Greenhouse":
+                sync_greenhouse(
+                    board_token=source["slug"],
+                    company_name=source["company"],
+                )
+            elif source["source"] == "Ashby":
+                sync_ashby(
+                    board_name=source["slug"],
+                    company_name=source["company"],
+                )
+            elif source["source"] == "SmartRecruiters":
+                sync_smartrecruiters(
+                    company_slug=source["slug"],
+                    company_name=source["company"],
+                )
+        except Exception as e:
+            # Log error for this specific source and continue to other sources so one failure doesn't abort the entire sync
+            logger.error(f"Error syncing {source['source']} ({source['company']}): {e}")
+            continue
 
-        if source["source"] == "Lever":
+    logger.info("All collection runs completed.")
 
-            sync_lever(
-                company_slug=source["slug"],
-                company_name=source["company"],
-            )
-
-        elif source["source"] == "Greenhouse":
-
-            sync_greenhouse(
-                board_token=source["slug"],
-                company_name=source["company"],
-            )
-        
-        elif source["source"] == "Ashby":
-
-            sync_ashby(
-                board_name=source["slug"],
-                company_name=source["company"],
-            )
-
-        elif source["source"] == "SmartRecruiters":
-
-            sync_smartrecruiters(
-                company_slug=source["slug"],
-                company_name=source["company"],
-            )
-            
-        
 
 if __name__ == "__main__":
     main()

@@ -1,207 +1,71 @@
 # MyJob
 
-**MyJob** is an automated job discovery and matching system that continuously collects internship and job opportunities from multiple sources, normalizes them into a common format, stores them in PostgreSQL, evaluates them against a candidate profile, and sends notifications for relevant opportunities.
-
-The project is being developed as a personal **job monitoring and intelligent matching system**, with an upcoming unsupervised ML layer for discovering job and skill patterns from the collected market data.
-
----
-
-## 🚀 Current Workflow
-
-```text
-Candidate Resume
-      ↓
-Resume Parser
-      ↓
-Candidate Profile
-      ↓
-                    ┌── Lever
-                    ├── Greenhouse
-Job Sources ────────┼── Ashby
-                    ├── SmartRecruiters
-                    └── Career Pages
-                           ↓
-                    Raw Job Data
-                           ↓
-                     Normalization
-                           ↓
-                      PostgreSQL
-                           ↓
-                 Eligibility Filtering
-                           ↓
-                    Job Matching
-                           ↓
-                    Match Score
-                           ↓
-                  Telegram Notification
-```
-
-The system also maintains the lifecycle of jobs by detecting whether previously collected jobs are still active or have disappeared from their source.
+## Overview
+MyJob is a **Telegram‑first** resume‑to‑job matching service. Candidates simply send their resume (PDF) to the bot and receive personalized job recommendations directly in the chat. The system continuously collects new technical job postings, clusters them using unsupervised learning, and matches each candidate profile to the most relevant clusters.
 
 ---
 
-## ✨ Features Implemented
+## Data Sources
+The job collector fetches postings from several public applicant‑tracking system (ATS) APIs:
 
-### 1. Resume Parsing
+- **Lever** (company: Aleph)
+- **Greenhouse** (company: Vercel)
+- **Ashby** (company: Linear)
+- **SmartRecruiters** (company: SmartRecruiters)
+- **Career Pages** (e.g., AdEngage)
 
-The system extracts candidate information from a resume PDF using **PyMuPDF**.
+These sources are defined in `src/jobs/registry.py` and are queried regularly by the scheduler.
 
-The parsed profile currently contains:
+---
 
-* Name
-* Skills
-* Education
-* Experience
-* Projects
-* Target job roles
+## Tech Stack
+- **Text Extraction:** PDF resumes are parsed with **PyMuPDF** to obtain raw text.
+- **Embedding & Semantic Matching:** Job descriptions and candidate profiles are encoded using a **pre‑trained sentence‑transformer model** (e.g., `all‑MiniLM‑L6‑v2`) via the **Transformers** library.
+- **Unsupervised Clustering:** The embeddings are grouped with **HDBSCAN**, providing flexible cluster counts and handling noise.
+- **Scheduler:** A lightweight Python scheduler (`src/jobs/scheduler.py`) runs an infinite loop with configurable interval (`SYNC_INTERVAL_HOURS`) and triggers the job sync and clustering pipeline.
+- **Database:** **PostgreSQL** stores users, profiles, jobs, and matches; SQLAlchemy is used as the ORM.
 
-The profile is stored as:
+---
 
-```text
-data/processed/candidate_profile.json
-```
+## Architecture
+The solution consists of four loosely coupled components that communicate through a shared PostgreSQL database:
 
-Example target roles:
+1. **Telegram Bot Service** – Handles user interactions, receives resumes, extracts text, creates candidate profiles, and delivers match notifications.
+2. **Job Collector & Normalizer** – Periodically scrapes or imports job listings, normalises fields, and stores them in the database.
+3. **Matching Engine** – Embeds job descriptions, performs unsupervised clustering, and evaluates similarity between a candidate profile and the clustered jobs.
+4. **Scheduler** – Orchestrates regular syncs (job collection, clustering, matching) and triggers the bot to send updates.
 
-```text
-Python Developer
-Backend Developer
-Software Engineer
-Data Engineer
-Java Developer
+```mermaid
+graph TD
+    A[Telegram Bot] --> B[Database]
+    C[Job Collector] --> B
+    D[Matching Engine] --> B
+    E[Scheduler] --> C
+    E --> D
+    D --> A
 ```
 
 ---
 
-### 2. Multi-Source Job Collection
+## Data Pipeline
+The end‑to‑end flow of a candidate’s resume through the system:
 
-MyJob supports multiple job collection mechanisms.
-
-#### Lever
-
-Uses the Lever public postings API.
-
-```text
-Source: Lever
-Example company: Aleph
-```
-
-The collector retrieves:
-
-* Job title
-* Company
-* Location
-* Description
-* Employment type
-* Application URL
-* Source job ID
+1. **Resume Upload** – User sends a PDF to the Telegram bot.
+2. **PDF Extraction** – Text is extracted and transformed into a **candidate profile** (skills, experience, etc.).
+3. **Job Collection** – Scheduler triggers collectors that fetch the latest job postings from configured sources.
+4. **Job Normalisation** – Raw postings are cleaned, fields are standardised, and stored.
+5. **Embedding & Clustering** – All job descriptions are embedded and grouped with an unsupervised clustering algorithm (HDBSCAN).
+6. **Similarity Matching** – The candidate profile is compared against the clustered jobs to find the most relevant matches.
+7. **Notification** – Top‑N matching jobs are sent back to the user via Telegram.
 
 ---
 
-#### Greenhouse
-
-Uses the Greenhouse public job board API.
-
-```text
-Source: Greenhouse
-Example company: Vercel
-```
-
-The collector retrieves job postings and their associated metadata.
-
----
-
-#### Ashby
-
-Uses the Ashby public posting API.
-
-```text
-Source: Ashby
-Example company: Linear
-```
-
-The current integration successfully collected **31 Linear jobs** in a single synchronization run.
-
----
-
-#### SmartRecruiters
-
-Uses the SmartRecruiters public API.
-
-The current integration successfully detects existing jobs and updates them instead of creating duplicate records.
-
----
-
-#### Career Page Collector
-
-MyJob also supports collecting jobs directly from company career pages using structured **JSON-LD JobPosting** data.
-
-An AdEngage career page integration successfully collected multiple positions, including:
-
-* Python Developer Intern
-* Business Operations Intern
-* HR Recruiter and Admin
-* SEO & PPC Intern
-* Social Media Marketing Intern
-* Video Editing Intern
-* Graphics Intern
-* Sales Executive
-* Client Servicing Executive
-
-and other available positions.
-
----
-
-## 🔄 Job Normalization
-
-Different job sources provide different data formats.
-
-MyJob converts these different formats into a common `RawJob → Job` representation.
-
-```text
-Source-specific job
-        ↓
-     RawJob
-        ↓
- Job Normalizer
-        ↓
-Normalized Job
-```
-
-The normalized job contains fields such as:
-
-```text
-title
-company
-location
-description
-skills
-experience_required
-employment_type
-application_method
-application_url
-source
-source_type
-source_job_id
-fingerprint
-source_company
-```
-
-HTML descriptions are cleaned before storage.
-
----
-
-## 🗄️ PostgreSQL Database
-
-PostgreSQL is used as the main persistent storage layer.
+## PostgreSQL Database
+The database stores the core entities used throughout the pipeline.
 
 ### Jobs
-
-The `jobs` table stores normalized job postings.
-
-Important fields include:
-
-```text
+Key fields include:
+```
 id
 source_job_id
 title
@@ -223,15 +87,9 @@ source_company
 missed_runs
 ```
 
----
-
-### Job Matching
-
-The `job_matches` table stores the matching results between the candidate and jobs.
-
-It contains:
-
-```text
+### Job Matches
+Records the matching result for each candidate‑job pair:
+```
 match_score
 matched_skills
 missing_skills
@@ -242,17 +100,9 @@ semantic_score
 application_url
 ```
 
-Each job has a unique matching record.
-
----
-
 ### Collection Runs
-
-The `collection_runs` table records every collection attempt.
-
-It tracks:
-
-```text
+Tracks each job‑collection attempt:
+```
 source
 source_company
 started_at
@@ -262,440 +112,51 @@ success
 error_message
 ```
 
-This allows failed collection runs to be distinguished from genuinely missing jobs.
+---
+
+## Module Overview
+| Package | Responsibility |
+|---------|----------------|
+| `src/notifications` | Telegram bot implementation, message handling, and user‑facing notifications. |
+| `src/database` | ORM models, repository helpers for users, profiles, jobs, and matches. |
+| `src/jobs` | Scheduler and job‑collector wrappers that periodically sync external listings. |
+| `src/matching` | Embedding generation, unsupervised clustering, and similarity scoring logic. |
+| `src/ml` | Utilities for loading pre‑trained language models and vector operations (kept internal). |
 
 ---
 
-## ♻️ Job Lifecycle Tracking
-
-MyJob does not immediately mark a job as closed when it disappears from one collection run.
-
-Instead, it uses consecutive missed runs.
-
-```text
-Job found
-   ↓
-missed_runs = 0
-   ↓
-Job missing once
-   ↓
-missed_runs = 1
-   ↓
-Job missing again
-   ↓
-status = closed
-```
-
-A job is therefore marked **closed only after two consecutive successful collection runs in which it is not found**.
-
-If the job appears again:
-
-```text
-status → active
-missed_runs → 0
-closed_at → NULL
-```
-
-Failed collection runs do not cause jobs to be closed.
-
-This prevents temporary API failures from being interpreted as job closures.
+## Getting Started
+1. **Clone the repository**
+   ```bash
+   git clone <repo-url>
+   cd myjob
+   ```
+2. **Create a virtual environment & install dependencies**
+   ```bash
+   python -m venv .venv
+   .venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+3. **Configure environment variables** – copy `.env.example` to `.env` and fill in the values (PostgreSQL connection, Telegram bot token, etc.).
 
 ---
 
-## 🧠 Matching Engine
-
-MyJob currently uses a hybrid matching system.
-
-The structured matching score combines:
-
-```text
-Skill Score
-Role Score
-Experience Score
-```
-
-with the current weighting:
-
-```text
-Structured Score
-    ↓
-50% Skill
-30% Role
-20% Experience
-```
-
-A semantic similarity component is also included:
-
-```text
-Semantic Score
-    ↓
-Skill similarity
-Experience similarity
-Project similarity
-```
-
-The final score combines structured and semantic matching.
-
-```text
-Final Score
-    =
-80% Structured Score
-+
-20% Semantic Score
-```
-
-The current default notification threshold is:
-
-```text
-75%
-```
-
-Jobs are classified as eligible/uncertain before matching, preventing obviously unrelated roles from being treated as strong matches.
-
----
-
-## 📱 Telegram Notifications
-
-When a newly collected job crosses the configured match threshold, MyJob can send a Telegram notification.
-
-The notification includes information such as:
-
-```text
-Job title
-Company
-Match percentage
-Skill score
-Role score
-Experience score
-Semantic score
-Application URL
-```
-
-This allows relevant opportunities to be surfaced automatically without manually checking every job source.
-
----
-
-## ⚙️ Automated Job Monitoring
-
-MyJob is designed to run continuously rather than requiring manual execution.
-
-The scheduler currently runs a synchronization cycle every **6 hours**.
-
-```text
-Scheduler
-    ↓
-Job Source Registry
-    ↓
-Collect jobs
-    ↓
-Normalize
-    ↓
-Insert / Update
-    ↓
-Lifecycle detection
-    ↓
-Evaluate new jobs
-    ↓
-Telegram notification
-    ↓
-Wait 6 hours
-    ↓
-Repeat
-```
-
-The scheduler is configured to run automatically through **Windows Task Scheduler**.
-
----
-
-## 📊 Current Job Sources
-
-| Source          | Example         | Status    |
-| --------------- | --------------- | --------- |
-| Lever           | Aleph           | ✅ Working |
-| Greenhouse      | Vercel          | ✅ Working |
-| Ashby           | Linear          | ✅ Working |
-| SmartRecruiters | SmartRecruiters | ✅ Working |
-| Career Page     | AdEngage        | ✅ Working |
-
-The system is designed so additional companies can be added through the source registry without rewriting the core synchronization pipeline.
-
----
-
-## 📁 Project Structure
-
-```text
-myjob/
-│
-├── src/
-│   ├── api/
-│   │
-│   ├── resume/
-│   │   ├── pdf_parser.py
-│   │   └── candidate_profile.py
-│   │
-│   ├── collectors/
-│   │   ├── lever/
-│   │   ├── greenhouse/
-│   │   ├── ashby/
-│   │   ├── smartrecruiters/
-│   │   └── career_page/
-│   │
-│   ├── normalization/
-│   │   ├── raw_job.py
-│   │   ├── job.py
-│   │   ├── html_cleaner.py
-│   │   └── job_normalizer.py
-│   │
-│   ├── matching/
-│   │   ├── job_matcher.py
-│   │   └── eligibility_filter.py
-│   │
-│   ├── database/
-│   │   ├── connection.py
-│   │   ├── job_repository.py
-│   │   ├── match_repository.py
-│   │   ├── collection_repository.py
-│   │   ├── job_lifecycle.py
-│   │   └── evaluate_jobs.py
-│   │
-│   ├── notifications/
-│   │   └── telegram.py
-│   │
-│   └── jobs/
-│       ├── registry.py
-│       ├── sync.py
-│       └── scheduler.py
-│
-├── data/
-│   ├── raw/
-│   └── processed/
-│       └── candidate_profile.json
-│
-├── tests/
-│
-├── main.py
-├── requirements.txt
-├── .env.example
-├── .gitignore
-└── README.md
-```
-
----
-
-## 🛠️ Tech Stack
-
-### Programming
-
-* Python 3.13
-* SQL
-
-### Data Processing
-
-* PyMuPDF
-* Pandas
-* NumPy
-* BeautifulSoup
-
-### Machine Learning / Matching
-
-* Scikit-learn
-* Sentence Transformers
-* Cosine similarity
-
-### Database
-
-* PostgreSQL
-* psycopg2
-
-### Job Sources
-
-* Lever API
-* Greenhouse API
-* Ashby API
-* SmartRecruiters API
-* Company career pages
-
-### Notifications
-
-* Telegram Bot API
-
-### Automation
-
-* Python scheduler
-* Windows Task Scheduler
-
-### Development
-
-* Git
-* GitHub
-* VS Code
-
----
-
-## 🔐 Environment Variables
-
-Create a `.env` file containing the database and notification configuration.
-
-Example:
-
-```env
-DATABASE_HOST=localhost
-DATABASE_PORT=5432
-DATABASE_NAME=myjob
-DATABASE_USER=postgres
-DATABASE_PASSWORD=YOUR_POSTGRES_PASSWORD
-
-TELEGRAM_BOT_TOKEN=YOUR_BOT_TOKEN
-TELEGRAM_CHAT_ID=YOUR_CHAT_ID
-
-MATCH_THRESHOLD=75
-```
-
-Do not commit `.env` to GitHub.
-
----
-
-## ▶️ Running MyJob
-
-Activate the virtual environment:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-Run the job synchronization:
-
-```powershell
-python -m src.jobs.sync
-```
-
-Run the automated scheduler:
-
-```powershell
+## Running the System
+```bash
+# Start the Telegram bot (runs in background)
+python -m src.notifications.bot_service &
+
+# Start the scheduler to keep jobs and matches up‑to‑date
 python -m src.jobs.scheduler
 ```
-
-The scheduler performs a synchronization every 6 hours.
-
----
-
-## 🔍 Example Synchronization
-
-A typical synchronization performs:
-
-```text
-Syncing Ashby: Linear
-Found 31 jobs
-
-Inserted: 31
-Updated: 0
-Seen: 31
-Missed: 0
-Closed: 0
-```
-
-Existing jobs are updated rather than duplicated:
-
-```text
-Syncing SmartRecruiters: SmartRecruiters
-Found 1 jobs
-
-Inserted: 0
-Updated: 1
-Seen: 1
-Missed: 0
-Closed: 0
-```
+The bot will listen for resume uploads and automatically push match notifications. The scheduler ensures the job catalogue stays fresh and clustering is refreshed regularly.
 
 ---
 
-## 🧪 Current Development Status
-
-### Completed
-
-* [x] Resume PDF parsing
-* [x] Candidate profile generation
-* [x] PostgreSQL database
-* [x] Job normalization
-* [x] Job fingerprinting
-* [x] Lever integration
-* [x] Greenhouse integration
-* [x] Ashby integration
-* [x] SmartRecruiters integration
-* [x] Career page integration
-* [x] Job insertion/updating
-* [x] Duplicate prevention
-* [x] Job lifecycle tracking
-* [x] Collection run tracking
-* [x] Eligibility filtering
-* [x] Structured job matching
-* [x] Semantic matching
-* [x] Match threshold
-* [x] Telegram notifications
-* [x] Automated 6-hour synchronization
-* [x] Windows Task Scheduler integration
-
-### 🚧 Next Phase — Machine Learning
-
-The next major component is an **unsupervised job market intelligence layer**.
-
-Planned pipeline:
-
-```text
-Collected Jobs
-      ↓
-Skill Feature Extraction
-      ↓
-Job × Skill Matrix
-      ↓
-Feature Engineering
-      ↓
-PCA
-      ↓
-K-Means / HDBSCAN
-      ↓
-Job Clusters
-      ↓
-UMAP Visualization
-      ↓
-Skill & Cluster Analysis
-```
-
-The ML layer will be used to discover patterns such as:
-
-* Groups of similar job roles
-* Common skill combinations
-* Job/skill clusters
-* Emerging combinations of technical skills
-* Similarity between different job-market segments
-
-This will eventually allow MyJob to move beyond simple candidate-to-job matching toward **data-driven job market intelligence**.
+## Contributing
+Contributions are welcome! Please open a pull request with a clear description of the change. Follow the existing code style and run the test suite (`pytest`) before submitting.
 
 ---
 
-## 🎯 Long-Term Goal
-
-The long-term goal of MyJob is to create an automated system that continuously understands the job market and connects it with a candidate's profile.
-
-```text
-                    ┌─────────────────────┐
-                    │    Job Market       │
-                    └──────────┬──────────┘
-                               ↓
-                    Automated Collection
-                               ↓
-                         Job Database
-                               ↓
-                  ┌────────────┴────────────┐
-                  ↓                         ↓
-          Job Matching                ML Analysis
-                  ↓                         ↓
-        Candidate Relevance        Market Patterns
-                  └────────────┬────────────┘
-                               ↓
-                         Notifications
-                               ↓
-                         Candidate
-```
-
-MyJob is therefore being developed as more than a job scraper: it is intended to become an **automated job discovery, matching, monitoring, and job-market intelligence system**.
+## License
+Distributed under the MIT License. See `LICENSE` for more information.

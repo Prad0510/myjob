@@ -202,10 +202,18 @@ def extract_experience(sections: dict) -> list[Experience]:
             duration = line
             continue
 
-        # Detect the organization from the known organization-style line.
-        if "L&T Skill Trainers Academy" in line:
-            organization = line
-            continue
+        # Check if line matches common organization/company indicators or is an early header line
+        org_keywords = (
+            r"\b(Academy|Technologies|Technology|Solutions|Services|Corp|Corporation|"
+            r"Inc|LLC|Ltd|Limited|Company|University|College|Institute|Labs?|Studio|"
+            r"Systems?|Software|Consulting|Group|Ventures|Enterprises)\b"
+        )
+        if not organization:
+            if re.search(org_keywords, line, re.IGNORECASE) or (
+                i <= 2 and not line.startswith(("-", "•", "*")) and len(line.split()) <= 7
+            ):
+                organization = line
+                continue
 
         description_lines.append(line)
 
@@ -303,13 +311,30 @@ def parse_resume(text: str) -> CandidateProfile:
         experience=extract_experience(sections),
         projects=extract_projects(sections),
     )
+    return profile
 
-def build_candidate_profile(text: str) -> CandidateProfile:
+
+DEFAULT_TARGET_ROLES = [
+    "Python Developer",
+    "Backend Developer",
+    "Software Engineer",
+    "Data Engineer",
+    "Java Developer",
+]
+
+
+def build_candidate_profile(
+    text: str,
+    target_roles: list[str] | None = None,
+) -> CandidateProfile:
     """
     Convert extracted resume text into a CandidateProfile.
     """
 
     sections = split_into_sections(text)
+
+    if target_roles is None:
+        target_roles = DEFAULT_TARGET_ROLES
 
     return CandidateProfile(
         name=extract_name(text),
@@ -317,12 +342,6 @@ def build_candidate_profile(text: str) -> CandidateProfile:
         education=extract_education(sections),
         experience=extract_experience(sections),
         projects=extract_projects(sections),
-        target_roles=[
-            "Python Developer",
-            "Backend Developer",
-            "Software Engineer",
-            "Data Engineer",
-            "Java Developer",
-        ],
+        target_roles=target_roles,
     )
 

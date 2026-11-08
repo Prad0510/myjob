@@ -1,0 +1,90 @@
+2026-11-05 17:35:29 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-06 13:04:01 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-06 17:32:38 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-06 17:32:38 [INFO] [myjob.database]: Database connection pool closed.
+2026-11-06 17:36:31 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-06 17:36:31 [INFO] [myjob.database]: Database connection pool closed.
+2026-11-06 17:37:34 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-06 17:37:34 [INFO] [myjob.database]: Database connection pool closed.
+2026-11-06 17:40:54 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-06 17:41:52 [INFO] [myjob.database]: Database connection pool closed.
+2026-11-06 17:47:33 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-06 17:49:41 [INFO] [myjob.database]: Database connection pool closed.
+2026-11-06 17:51:28 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-06 17:52:17 [INFO] [myjob.database]: Database connection pool closed.
+2026-11-06 17:57:54 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-06 17:58:39 [INFO] [myjob.database]: Database connection pool closed.
+2026-11-08 17:12:30 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-08 17:56:08 [INFO] [myjob.sync]: Starting collection runs across all registered sources...
+2026-11-08 17:56:08 [INFO] [myjob.sync]: Syncing Lever: Aleph (slug: aleph)
+2026-11-08 17:56:08 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-08 17:56:13 [INFO] [myjob.sync]: Lever [Aleph]: Found 134 jobs
+2026-11-08 17:56:14 [INFO] [myjob.sync]: Evaluating 40 new jobs against candidate profile...
+2026-11-08 17:56:18 [INFO] [myjob.evaluate]: Evaluated 40 jobs: 12 eligible/uncertain, 0 above threshold (75.0%).
+2026-11-08 17:56:18 [INFO] [myjob.sync]: Lever [Aleph] sync complete: Inserted=40, Updated=94, Seen=134, Missed=11, Closed=25
+2026-11-08 17:56:18 [INFO] [myjob.sync]: Syncing Greenhouse: Vercel (token: vercel)
+2026-11-08 17:56:19 [INFO] [myjob.sync]: Greenhouse [Vercel]: Found 87 jobs
+2026-11-08 17:56:19 [INFO] [myjob.sync]: Evaluating 16 new jobs against candidate profile...
+2026-11-08 17:56:20 [INFO] [myjob.evaluate]: Evaluated 16 jobs: 5 eligible/uncertain, 0 above threshold (75.0%).
+2026-11-08 17:56:20 [INFO] [myjob.sync]: Greenhouse [Vercel] sync complete: Inserted=16, Updated=71, Seen=0, Missed=0, Closed=0
+2026-11-08 17:56:20 [INFO] [myjob.sync]: Syncing Ashby: Linear (board: linear)
+2026-11-08 17:56:21 [INFO] [myjob.sync]: Ashby [Linear]: Found 32 jobs
+2026-11-08 17:56:21 [INFO] [myjob.sync]: Evaluating 9 new jobs against candidate profile...
+2026-11-08 17:56:22 [INFO] [myjob.evaluate]: Evaluated 9 jobs: 4 eligible/uncertain, 0 above threshold (75.0%).
+2026-11-08 17:56:22 [INFO] [myjob.sync]: Ashby [Linear] sync complete: Inserted=9, Updated=23, Seen=32, Missed=5, Closed=5
+2026-11-08 17:56:22 [INFO] [myjob.sync]: Syncing SmartRecruiters: SmartRecruiters (slug: smartrecruiters)
+2026-11-08 17:56:23 [INFO] [myjob.sync]: SmartRecruiters [SmartRecruiters]: Found 2 jobs
+2026-11-08 17:56:23 [INFO] [myjob.sync]: Evaluating 2 new jobs against candidate profile...
+2026-11-08 17:56:23 [INFO] [myjob.evaluate]: Evaluated 2 jobs: 1 eligible/uncertain, 0 above threshold (75.0%).
+2026-11-08 17:56:23 [INFO] [myjob.sync]: SmartRecruiters [SmartRecruiters] sync complete: Inserted=2, Updated=0, Seen=2, Missed=0, Closed=1
+2026-11-08 17:56:23 [INFO] [myjob.sync]: All collection runs completed.
+2026-11-08 17:59:09 [INFO] [myjob.scheduler]: MyJob scheduler started.
+2026-11-08 17:59:09 [INFO] [myjob.scheduler]: Sync interval set to 6.0 hours.
+2026-11-08 17:59:09 [INFO] [myjob.scheduler]: Starting job sync cycle...
+2026-11-08 17:59:09 [INFO] [myjob.sync]: Starting collection runs across all registered sources...
+2026-11-08 17:59:09 [INFO] [myjob.sync]: Syncing Lever: Aleph (slug: aleph)
+2026-11-08 17:59:09 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-08 17:59:13 [INFO] [myjob.sync]: Lever [Aleph]: Found 134 jobs
+2026-11-08 17:59:13 [INFO] [myjob.sync]: Lever [Aleph] sync complete: Inserted=0, Updated=134, Seen=134, Missed=0, Closed=11
+2026-11-08 17:59:13 [INFO] [myjob.sync]: Syncing Greenhouse: Vercel (token: vercel)
+2026-11-08 17:59:14 [INFO] [myjob.sync]: Greenhouse [Vercel]: Found 87 jobs
+2026-11-08 17:59:14 [INFO] [myjob.sync]: Greenhouse [Vercel] sync complete: Inserted=0, Updated=87, Seen=0, Missed=0, Closed=0
+2026-11-08 17:59:14 [INFO] [myjob.sync]: Syncing Ashby: Linear (board: linear)
+2026-11-08 17:59:15 [INFO] [myjob.sync]: Ashby [Linear]: Found 32 jobs
+2026-11-08 17:59:15 [INFO] [myjob.sync]: Ashby [Linear] sync complete: Inserted=0, Updated=32, Seen=32, Missed=0, Closed=5
+2026-11-08 17:59:15 [INFO] [myjob.sync]: Syncing SmartRecruiters: SmartRecruiters (slug: smartrecruiters)
+2026-11-08 17:59:16 [INFO] [myjob.sync]: SmartRecruiters [SmartRecruiters]: Found 2 jobs
+2026-11-08 17:59:16 [INFO] [myjob.sync]: SmartRecruiters [SmartRecruiters] sync complete: Inserted=0, Updated=2, Seen=2, Missed=0, Closed=0
+2026-11-08 17:59:16 [INFO] [myjob.sync]: All collection runs completed.
+2026-11-08 17:59:16 [INFO] [myjob.scheduler]: Job sync completed successfully.
+2026-11-08 17:59:16 [INFO] [myjob.scheduler]: Next sync in 6.0 hours (21600s). Sleeping...
+2026-11-08 17:59:44 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-08 18:00:32 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-08 18:01:40 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-08 18:02:16 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-08 18:05:04 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-08 18:08:05 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-08 18:08:05 [INFO] [myjob.database]: Database connection pool closed.
+2026-11-08 18:11:05 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-08 18:11:05 [INFO] [myjob.evaluate]: Active jobs: 302 total, 63 technical software/engineering jobs.
+2026-11-08 18:11:10 [INFO] [myjob.clustering]: Clustering 63 jobs using hdbscan
+2026-11-08 18:11:10 [INFO] [myjob.evaluate]: HDBSCAN clusters formed: [0, 1] (noise count: 1)
+2026-11-08 18:11:10 [INFO] [myjob.evaluate]: Candidate mapped to HDBSCAN Cluster 0.
+2026-11-08 18:11:10 [INFO] [myjob.evaluate]: Selected Top 5 matching jobs from candidate cluster.
+2026-11-08 18:11:11 [INFO] [myjob.evaluate]: New match saved: Software Engineer, AI Gateway at Vercel (Similarity: 45.27%)
+2026-11-08 18:11:12 [INFO] [myjob.evaluate]: Telegram notification sent for job 66: Software Engineer, AI Gateway
+2026-11-08 18:11:13 [INFO] [myjob.evaluate]: New match saved: Software Engineering Intern - Winter '27 at Vercel (Similarity: 45.07%)
+2026-11-08 18:11:14 [INFO] [myjob.evaluate]: Telegram notification sent for job 217: Software Engineering Intern - Winter '27
+2026-11-08 18:11:14 [INFO] [myjob.evaluate]: New match saved: Software Engineering Intern - Summer '27 at Vercel (Similarity: 44.9%)
+2026-11-08 18:11:15 [INFO] [myjob.evaluate]: Telegram notification sent for job 216: Software Engineering Intern - Summer '27
+2026-11-08 18:11:15 [INFO] [myjob.evaluate]: New match saved: Machine Learning Engineer, Trust & Safety at Vercel (Similarity: 43.9%)
+2026-11-08 18:11:16 [INFO] [myjob.evaluate]: Telegram notification sent for job 308: Machine Learning Engineer, Trust & Safety
+2026-11-08 18:11:17 [INFO] [myjob.evaluate]: New match saved: Software Engineer, AI SDK at Vercel (Similarity: 43.87%)
+2026-11-08 18:11:39 [INFO] [myjob.evaluate]: Telegram notification sent for job 67: Software Engineer, AI SDK
+2026-11-08 18:12:09 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-08 18:25:56 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-08 18:26:20 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-08 18:26:50 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-08 18:33:42 [INFO] [myjob.database]: Initializing database connection pool: host=localhost:5432, db=myjob, user=postgres, min=1, max=10
+2026-11-08 18:38:41 [INFO] [myjob.telegram_bot]: Starting Telegram Bot listener...
+2026-11-08 19:31:39 [INFO] [myjob.scheduler]: Scheduler interrupted by user. Shutting down gracefully.

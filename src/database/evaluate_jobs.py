@@ -1,327 +1,296 @@
 import os
+import json
+import numpy as np
 from dotenv import load_dotenv
 
-load_dotenv()
-import json
 from src.database.match_repository import save_match
 from src.database.connection import get_connection
+from src.database.user_repository import get_all_active_users_with_profiles
 from src.matching.job_matcher import match_job
-from src.matching.eligibility_filter import classify_eligibility
+from src.ml.technical_filter import detect_technical_role, detect_technical_skills
+from src.embeddings import embed_text
+from src.jobs.clustering import cluster_jobs, assign_candidate_to_cluster
 from src.notifications.telegram import send_telegram_message
-from src.database.match_repository import save_match
+from src.utils.logger import get_logger
 
-MATCH_THRESHOLD = float(
-    os.getenv("MATCH_THRESHOLD", 75)
-)
+load_dotenv()
+logger = get_logger("evaluate")
 
-def load_candidate_skills():
-
-    with open(
-        "data/processed/candidate_profile.json",
-        "r",
-        encoding="utf-8"
-    ) as file:
-        candidate = json.load(file)
-
-    return candidate["skills"]
-
-def load_target_roles():
-    with open(
-        "data/processed/candidate_profile.json",
-        "r",
-        encoding="utf-8"
-    ) as file:
-
-        candidate_data = json.load(file)
-
-    return candidate_data.get(
-        "target_roles",
-        []
-    )
-    
-def load_candidate_experience():
-    with open(
-        "data/processed/candidate_profile.json",
-        "r",
-        encoding="utf-8"
-    ) as file:
-        candidate_data = json.load(file)
-
-    experience = candidate_data.get("experience", [])
-
-    return " ".join(
-        f"{item.get('role', '')} at {item.get('organization', '')}. "
-        f"{item.get('description', '')}"
-        for item in experience
-    )
+TOP_N_MATCHES = int(os.getenv("TOP_N_MATCHES", 5))
+CANDIDATE_PROFILE_PATH = os.getenv("CANDIDATE_PROFILE_PATH", "data/processed/candidate_profile.json")
 
 
-def load_candidate_projects():
-    with open(
-        "data/processed/candidate_profile.json",
-        "r",
-        encoding="utf-8"
-    ) as file:
-        candidate_data = json.load(file)
+def is_job_technical(title: str, description: str) -> bool:
+    """Isolate technical software/engineering jobs from HR, sales, or support."""
+    if detect_technical_role(title):
+        return True
+    skill_count = detect_technical_skills(title, description or "")
+    if skill_count >= 1 and any(
+        w in title.lower() for w in ["engineer", "developer", "architect", "programmer", "intern"]
+    ):
+        return True
+    return False
 
-    projects = candidate_data.get("projects", [])
 
-    return " ".join(
-        f"{item.get('name', '')}. "
-        f"Technologies: {', '.join(item.get('technologies', []))}. "
-        f"{item.get('description', '')}"
-        for item in projects
-    )
+def load_candidate_representation(profile_data: dict) -> tuple[str, np.ndarray]:
+    """Builds a rich textual representation and dense embedding for candidate."""
+    parts = []
+    if profile_data.get("name"):
+        parts.append(profile_data["name"])
+    if profile_data.get("target_roles"):
+        parts.append("Target Roles: " + ", ".join(profile_data["target_roles"]))
+    if profile_data.get("skills"):
+        parts.append("Skills: " + ", ".join(profile_data["skills"]))
+    for exp in profile_data.get("experience", []):
+        parts.append(f"{exp.get('role', '')} at {exp.get('organization', '')}. {exp.get('description', '')}")
+    for proj in profile_data.get("projects", []):
+        techs = ", ".join(proj.get("technologies", []))
+        parts.append(f"{proj.get('name', '')}. Technologies: {techs}. {proj.get('description', '')}")
 
-def evaluate_jobs(job_ids):
+    cand_text = " ".join(filter(None, parts))
+    if not cand_text.strip():
+        cand_text = "Software Engineer Python Developer"
 
-    candidate_skills = load_candidate_skills()
-    target_roles = load_target_roles()
-    candidate_experience = load_candidate_experience()
-    candidate_projects = load_candidate_projects()
+    cand_emb = embed_text(cand_text)
+    return cand_text, cand_emb
 
-    
 
+def fetch_active_technical_jobs():
+    """Retrieve all active technical jobs and their embeddings."""
     connection = get_connection()
-    cursor = connection.cursor()
-    
-    if not job_ids:
-        print("No new jobs to evaluate.")
-        return
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    title,
+                    company,
+                    location,
+                    skills,
+                    experience_required,
+                    description,
+                    application_url
+                FROM jobs
+                WHERE status = 'active'
+                ORDER BY id;
+                """
+            )
+            all_jobs = cursor.fetchall()
+    finally:
+        connection.close()
+
+    tech_jobs = [job for job in all_jobs if is_job_technical(job[1], job[6] or "")]
+
+    if not tech_jobs:
+        return [], None, None, None, []
+
+    job_texts = []
+    for job in tech_jobs:
+        parts = [job[1]]
+        if job[4]:
+            parts.append(" ".join(job[4]))
+        if job[6]:
+            parts.append(job[6][:1500])
+        job_texts.append(" ".join(parts))
+
+    job_embs = embed_text(job_texts)
+    labels, centroids, unique_labels = cluster_jobs(job_embs)
+    return tech_jobs, job_embs, labels, centroids, unique_labels
 
 
-    placeholders = ", ".join(["%s"] * len(job_ids))
+def evaluate_single_candidate(
+    user_id: int | None,
+    telegram_chat_id: int | None,
+    candidate_profile_data: dict,
+    tech_jobs: list,
+    job_embs: np.ndarray,
+    labels: np.ndarray,
+    centroids: np.ndarray,
+    unique_labels: list,
+) -> int:
+    """Matches a specific candidate against active job clusters and sends notifications."""
+    if not tech_jobs or job_embs is None:
+        return 0
 
-    cursor.execute(
-        f"""
-        SELECT
-            id,
-            title,
-            company,
-            location,
-            skills,
-            experience_required,
-            description,
-            application_url
-        FROM jobs
-        WHERE id IN ({placeholders})
-        ORDER BY id;
-        """,
-        job_ids
+    cand_text, cand_emb = load_candidate_representation(candidate_profile_data)
+    candidate_skills = candidate_profile_data.get("skills", [])
+    target_roles = candidate_profile_data.get("target_roles", [])
+    candidate_experience = " ".join(
+        f"{item.get('role', '')} at {item.get('organization', '')}. {item.get('description', '')}"
+        for item in candidate_profile_data.get("experience", [])
+    )
+    candidate_projects = " ".join(
+        f"{item.get('name', '')}. Technologies: {', '.join(item.get('technologies', []))}. {item.get('description', '')}"
+        for item in candidate_profile_data.get("projects", [])
     )
 
-    jobs = cursor.fetchall()
+    best_cluster = assign_candidate_to_cluster(cand_emb, centroids, unique_labels)
 
-    cursor.close()
-    connection.close()
+    if best_cluster == -1:
+        candidate_pool_jobs = tech_jobs
+        candidate_pool_embs = job_embs
+    else:
+        cluster_mask = labels == best_cluster
+        candidate_pool_jobs = [tech_jobs[i] for i in range(len(tech_jobs)) if cluster_mask[i]]
+        candidate_pool_embs = job_embs[cluster_mask]
 
-    results = []
+    cand_norm = cand_emb / np.linalg.norm(cand_emb)
+    job_norms = candidate_pool_embs / np.linalg.norm(candidate_pool_embs, axis=1, keepdims=True)
+    sims = np.dot(job_norms, cand_norm)
 
-    for (
-        job_id,
-        title,
-        company,
-        location,
-        job_skills,
-        experience_required,
-        description,
-        application_url
-    ) in jobs:
+    top_k = min(TOP_N_MATCHES, len(candidate_pool_jobs))
+    top_indices = np.argsort(-sims)[:top_k]
 
-        job_skills = job_skills or []
-        
-        if title in ["IT Systems Engineer", "Site Engineer"]:
-            print("\n" + "=" * 80)
-            print(f"DEBUG JOB: {title}")
-            print("=" * 80)
-            print("\nEXTRACTED SKILLS:")
-            print(job_skills)
-            print("\nFULL JOB DESCRIPTION:")
-            print(description)
-            print("=" * 80)
+    new_matches_count = 0
 
-        
-        eligibility = classify_eligibility(
-        title,
-        experience_required or "",
-        description or ""
-    )
+    for idx in top_indices:
+        job = candidate_pool_jobs[idx]
+        similarity = float(sims[idx])
 
-        if eligibility == "not_eligible":
-            continue
+        job_id = job[0]
+        title = job[1]
+        company = job[2]
+        location = job[3]
+        skills = job[4] or []
+        exp_req = job[5] or ""
+        desc = job[6] or ""
+        app_url = job[7] or ""
 
-        match_result = match_job(
-    candidate_skills=candidate_skills,
-    job_title=title,
-    job_skills=job_skills,
-    experience_required=experience_required or "",
-    target_roles=target_roles,
-    job_description=description or "",
-    candidate_experience=candidate_experience,
-    candidate_projects=candidate_projects
-)
+        match_breakdown = match_job(
+            candidate_skills=candidate_skills,
+            job_title=title,
+            job_skills=skills,
+            experience_required=exp_req,
+            target_roles=target_roles,
+            job_description=desc,
+            candidate_experience=candidate_experience,
+            candidate_projects=candidate_projects,
+        )
 
-        results.append({
-            "job_id": job_id,
-            "title": title,
-            "company": company,
-            "location": location,
-            "application_url": application_url,
-            "eligibility": eligibility,
-            "skill_score": match_result["skill_score"],
-            "role_score": match_result["role_score"],
-            "experience_score": match_result["experience_score"],
-            "semantic_score": match_result["semantic_score"],
-            "semantic_skill_similarity": match_result["semantic_skill_similarity"],
-            "semantic_experience_similarity": match_result["semantic_experience_similarity"],
-            "semantic_project_similarity": match_result["semantic_project_similarity"],
-            "final_score": match_result["final_score"],
-            "matched_skills": match_result.get(
-                "matched_skills", []
-            ),
-            "missing_skills": match_result.get(
-                "missing_skills", []
-            ),
-        })
+        final_percent = round(similarity * 100, 1)
 
-    # Highest final score first
-    eligibility_priority = {
-    "eligible": 2,
-    "uncertain": 1,
-    "not_eligible": 0
-    }
-
-    results.sort(
-    key=lambda job: (
-        eligibility_priority[job["eligibility"]],
-        job["final_score"]
-    ),
-    reverse=True
-)   
-    matching_jobs = [
-    job
-    for job in results
-    if job["final_score"] >= MATCH_THRESHOLD
-]
-    # Save and notify new matches above the threshold
-    for job in matching_jobs:
-
-        saved = save_match({
-            "job_id": job["job_id"],
-            "final_score": job["final_score"],
-            "matched_skills": job["matched_skills"],
-            "missing_skills": job["missing_skills"],
-            "role_score": job["role_score"],
-            "skill_score": job["skill_score"],
-            "experience_score": job["experience_score"],
-            "semantic_score": job["semantic_score"],
-            "application_url": job["application_url"],
-        })
+        saved = save_match(
+            {
+                "job_id": job_id,
+                "final_score": final_percent,
+                "matched_skills": match_breakdown.get("matched_skills", []),
+                "missing_skills": match_breakdown.get("missing_skills", []),
+                "role_score": match_breakdown.get("role_score", 0),
+                "skill_score": match_breakdown.get("skill_score", 0),
+                "experience_score": match_breakdown.get("experience_score", 0),
+                "semantic_score": round(similarity * 100, 2),
+                "application_url": app_url,
+            },
+            user_id=user_id,
+        )
 
         if saved:
+            new_matches_count += 1
+            logger.info(f"Match saved for user {user_id}: {title} at {company}")
+
+            # Consumer-friendly message (does NOT reveal backend modules or algorithms)
+            matched_skills_str = ", ".join(match_breakdown.get("matched_skills", [])[:5]) or "Technical alignment"
+            location_str = location if location else "Remote / Flexible"
+
             message = (
-                "🚀 New MyJob Match!\n\n"
-                f"Role: {job['title']}\n"
-                f"Company: {job['company']}\n"
-                f"Location: {job['location']}\n\n"
-                f"Apply: {job['application_url']}\n\n"
-                f"Match Score: {job['final_score']}%\n"
-                f"Skill Score: {job['skill_score']}%\n"
-                f"Role Score: {job['role_score']}%\n"
-                f"Experience Score: {job['experience_score']}%\n"
-                f"Semantic Score: {job['semantic_score']}%\n\n"
-                f"Matched Skills: {', '.join(job['matched_skills']) or 'None'}\n"
-                f"Missing Skills: {', '.join(job['missing_skills']) or 'None'}"
+                f"🎯 <b>New Opportunity Matched!</b>\n\n"
+                f"📌 <b>Role:</b> {title}\n"
+                f"🏢 <b>Company:</b> {company}\n"
+                f"📍 <b>Location:</b> {location_str}\n\n"
+                f"⭐️ <b>Profile Match:</b> {final_percent}%\n"
+                f"✨ <b>Key Matching Skills:</b> {matched_skills_str}\n\n"
+                f"🔗 <a href=\"{app_url}\"><b>View Role & Apply Here</b></a>"
             )
 
-            send_telegram_message(message)
+            try:
+                send_telegram_message(message, chat_id=telegram_chat_id)
+            except Exception as e:
+                logger.error(f"Failed to send Telegram message to {telegram_chat_id}: {e}")
 
-            print(
-                f"📱 Telegram notification sent: "
-                f"{job['title']} ({job['final_score']}%)"
+    return new_matches_count
+
+
+def evaluate_user_jobs(user_id: int) -> int:
+    """Evaluate jobs specifically for one registered user (e.g. immediately after upload)."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT u.id, u.telegram_chat_id, cp.profile_data
+                FROM users u
+                JOIN candidate_profiles cp ON cp.user_id = u.id
+                WHERE u.id = %s;
+                """,
+                (user_id,),
             )
-    print("\n===== ALL ELIGIBLE/UNCERTAIN JOBS =====")
+            row = cur.fetchone()
+    finally:
+        conn.close()
 
-    for job in results:
-        print(
-        job["title"],
-        "|",
-        job["eligibility"],
-        "|",
-        job["final_score"]
+    if not row:
+        return 0
+
+    uid, chat_id, profile_data = row
+    if isinstance(profile_data, str):
+        profile_data = json.loads(profile_data)
+
+    tech_jobs, job_embs, labels, centroids, unique_labels = fetch_active_technical_jobs()
+    return evaluate_single_candidate(
+        user_id=uid,
+        telegram_chat_id=chat_id,
+        candidate_profile_data=profile_data,
+        tech_jobs=tech_jobs,
+        job_embs=job_embs,
+        labels=labels,
+        centroids=centroids,
+        unique_labels=unique_labels,
     )
-        
-    print("\n===== TOP MATCH DETAILS =====")
 
-    top_matches = sorted(
-    results,
-    key=lambda job: job["final_score"],
-    reverse=True
-    )
-    for job in top_matches[:3]:
-        print("\n" + "=" * 60)
-        print(f'{job["title"]} ({job["company"]})')
-        print(f'Final score: {job["final_score"]}%')
-        print(f'Skill score: {job["skill_score"]}%')
-        print(f'Role score: {job["role_score"]}%')
-        print(f'Experience score: {job["experience_score"]}%')
-        print(f'Semantic score: {job["semantic_score"]}%')
-        print(f'Semantic skill similarity: {job["semantic_skill_similarity"]}%')
-        print(f'Semantic experience similarity: {job["semantic_experience_similarity"]}%')
-        print(f'Semantic project similarity: {job["semantic_project_similarity"]}%')
-        print(f'Matched skills: {job["matched_skills"]}')
-        print(f'Missing skills: {job["missing_skills"]}')
-        print(f'Eligibility: {job["eligibility"]}')
-    
-    print("\n===== JOBS ABOVE THRESHOLD =====")
 
-    print(
-    f"Match threshold: {MATCH_THRESHOLD}%"
-    )
-    for job in matching_jobs:
+def evaluate_jobs(job_ids: list[int] | None = None):
+    """
+    Multi-tenant job matching across all registered users.
+    Called by the sync/scheduler pipeline when new jobs arrive.
+    """
+    active_users = get_all_active_users_with_profiles()
+    tech_jobs, job_embs, labels, centroids, unique_labels = fetch_active_technical_jobs()
 
-        print("\n" + "=" * 60)
+    if not tech_jobs:
+        logger.warning("No technical jobs available to evaluate.")
+        return
 
-        print(
-            f'{job["title"]} '
-            f'({job["company"]})'
-        )
-
-        print(
-            f'Final score: '
-            f'{job["final_score"]}%'
-        )
-
-        print(
-            f'Skill score: '
-            f'{job["skill_score"]}%'
-        )
-
-        print(
-            f'Role score: '
-            f'{job["role_score"]}%'
-        )
-
-        print(
-            f'Experience score: '
-            f'{job["experience_score"]}%'
-        )
-
-        print(
-            f'Matched: '
-            f'{job["matched_skills"]}'
-        )
-
-        print(
-            f'Missing: '
-            f'{job["missing_skills"]}'
-        )
-        
-        print(
-    f'Eligibility: '
-    f'{job["eligibility"]}'
-)
+    # If users exist in database, evaluate for each active user
+    if active_users:
+        logger.info(f"Evaluating opportunities for {len(active_users)} registered users...")
+        for user in active_users:
+            evaluate_single_candidate(
+                user_id=user["user_id"],
+                telegram_chat_id=user["telegram_chat_id"],
+                candidate_profile_data=user["profile_data"],
+                tech_jobs=tech_jobs,
+                job_embs=job_embs,
+                labels=labels,
+                centroids=centroids,
+                unique_labels=unique_labels,
+            )
+    else:
+        # Fallback to local candidate profile file if no multi-tenant users are registered yet
+        if os.path.exists(CANDIDATE_PROFILE_PATH):
+            with open(CANDIDATE_PROFILE_PATH, "r", encoding="utf-8") as f:
+                local_profile = json.load(f)
+            evaluate_single_candidate(
+                user_id=None,
+                telegram_chat_id=None,
+                candidate_profile_data=local_profile,
+                tech_jobs=tech_jobs,
+                job_embs=job_embs,
+                labels=labels,
+                centroids=centroids,
+                unique_labels=unique_labels,
+            )
 
 
 if __name__ == "__main__":
-    print("Please provide job IDs when calling evaluate_jobs().")
+    evaluate_jobs()
